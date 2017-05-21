@@ -16,7 +16,6 @@ Type `git-br` in your repo or provide a path as a first argument.
 
 - [ ] add tests
 - [ ] clean code
-- [ ] add vendoring
 - [ ] use shift-enter to switch branch and quit
 - [ ] highlight master/develop branches
 - [ ] display file information, e.g diff with master
