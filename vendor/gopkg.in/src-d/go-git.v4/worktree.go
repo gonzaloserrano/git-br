@@ -60,7 +60,6 @@ func (w *Worktree) Checkout(opts *CheckoutOptions) error {
 	if !opts.Hash.IsZero() {
 		err = w.setHEADToCommit(opts.Hash)
 	} else {
-		//dumper.YK(opts.Branch, c)
 		err = w.setHEADToBranch(opts.Branch, c)
 	}
 

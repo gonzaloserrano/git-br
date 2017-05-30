@@ -102,9 +102,9 @@ func (l *List) AddItems(items ...string) {
 }
 
 func (l *List) RemoveItems() {
-	l.items = []string{}
-	l.pos = 0
-	l.selected = -1
+       l.items = []string{}
+       l.pos = 0
+       l.selected = -1
 }
 
 func (l *List) SetSelected(i int) {
