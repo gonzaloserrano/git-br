@@ -6,7 +6,7 @@ I wrote it because normally I work with tons of local branches and I needed a be
 
 ## install
 
-Download, compile and install with `go get -u github.com/gonzaloserrano/git-br`.
+Download, compile and install with `go get -u github.com/gonzaloserrano/git-br/cmd/git-br`.
 
 If you don't have `$GOPATH/bin` in your `$PATH`, you can for e.g `$ cp $GOPATH/bin/git-br /usr/local/bin`.
 

@@ -1,8 +1,7 @@
-package main
+package gitbr
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -24,19 +23,15 @@ func (i brInfo) String() string {
 	return fmt.Sprintf("%s|%s|o %s", i.Author.When.String()[:19], i.Author.Name, i.Name)
 }
 
-func main() {
-	path := "."
-	if len(os.Args) > 1 {
-		path = os.Args[1]
-	}
+func Open(path string) error {
 	repo, err := git.PlainOpen(path)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	brs, err := repo.Branches()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	infoMap := make(map[string]brInfo)
@@ -101,7 +96,10 @@ func main() {
 		status.SetText("switched to " + info[l.Selected()].Name)
 	})
 
-	if err := ui.Run(); err != nil {
-		panic(err)
+	err = ui.Run()
+	if err != nil {
+		return err
 	}
+
+	return nil
 }
