@@ -13,29 +13,64 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
 
-type brInfo struct {
+// UIRunner wraps the function to Run an UI
+type UIRunner interface {
+	Run() error
+}
+
+// Open returns an UIRunner from a git repository filesystem path.
+func Open(path string) (UIRunner, error) {
+	repo, err := git.PlainOpen(path)
+	if err != nil {
+		return nil, err
+	}
+
+	brs, err := extract(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	return newTuiUIRunner(repo, brs), nil
+}
+
+type branch struct {
 	Name   string
 	Author object.Signature
 	Branch plumbing.ReferenceName
 }
 
-func (i brInfo) String() string {
+func (i branch) String() string {
 	return fmt.Sprintf("%s|%s|o %s", i.Author.When.String()[:19], i.Author.Name, i.Name)
 }
 
-func Open(path string) error {
-	repo, err := git.PlainOpen(path)
-	if err != nil {
-		return err
-	}
+type branches map[string]*branch
 
+func (brs branches) sort() []*branch {
+	var list []*branch
+	for _, br := range brs {
+		list = append(list, br)
+	}
+	// sort by date desc
+	sort.Slice(list, func(i, j int) bool { return list[i].Author.When.Unix() > list[j].Author.When.Unix() })
+	return list
+}
+
+func (brs branches) displayData() []string {
+	var data []string
+	for _, br := range brs.sort() {
+		data = append(data, br.String())
+	}
+	data = strings.Split(columnize.SimpleFormat(data), "\n")
+	return data
+}
+
+func extract(repo *git.Repository) (branches, error) {
 	brs, err := repo.Branches()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	infoMap := make(map[string]brInfo)
-	var info []brInfo
+	brsByName := make(branches)
 	brs.ForEach(func(br *plumbing.Reference) error {
 		commit, err := repo.CommitObject(br.Hash())
 		if err != nil {
@@ -43,24 +78,19 @@ func Open(path string) error {
 			return nil
 		}
 		name := br.Name()
-		brInfo := brInfo{name.Short(), commit.Author, name}
-		infoMap[name.Short()] = brInfo
-		info = append(info, brInfo)
+		branch := &branch{name.Short(), commit.Author, name}
+		brsByName[name.Short()] = branch
 		return nil
 	})
 
-	sort.Slice(info, func(i, j int) bool { return info[i].Author.When.Unix() > info[j].Author.When.Unix() })
-	var infostr []string
-	for _, inf := range info {
-		infostr = append(infostr, inf.String())
-	}
-	infostr = strings.Split(columnize.SimpleFormat(infostr), "\n")
+	return brsByName, nil
+}
 
-	// ---
-
+func newTuiUIRunner(repo *git.Repository, brs branches) tui.UI {
 	l := tui.NewList()
 	l.SetFocused(true)
-	l.AddItems(infostr...)
+	list := brs.displayData()
+	l.AddItems(list...)
 	l.SetSelected(0)
 
 	status := tui.NewStatusBar("")
@@ -86,20 +116,16 @@ func Open(path string) error {
 		if err != nil {
 			status.SetText(err.Error())
 		}
+		br := brs.sort()[l.Selected()]
 		err = w.Checkout(&git.CheckoutOptions{
-			Branch: infoMap[info[l.Selected()].Name].Branch,
+			Branch: brs[br.Name].Branch,
 			Force:  true,
 		})
 		if err != nil {
 			status.SetText(err.Error())
 		}
-		status.SetText("switched to " + info[l.Selected()].Name)
+		status.SetText("switched to " + br.Name)
 	})
 
-	err = ui.Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ui
 }

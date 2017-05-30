@@ -10,6 +10,15 @@ import (
 func TestOpenInvalidPathErrors(t *testing.T) {
 	assert := assert.New(t)
 
-	err := gitbr.Open("foo")
+	ui, err := gitbr.Open("foo")
 	assert.Error(err)
+	assert.Nil(ui)
+}
+
+func TestOpenCurrentRepository(t *testing.T) {
+	assert := assert.New(t)
+
+	ui, err := gitbr.Open("")
+	assert.NoError(err)
+	assert.NotNil(ui)
 }

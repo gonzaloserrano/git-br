@@ -12,10 +12,17 @@ func main() {
 	if len(os.Args) > 1 {
 		path = os.Args[1]
 	}
-	err := gitbr.Open(path)
+	uiRunner, err := gitbr.Open(path)
 	if err != nil {
 		fmt.Sprintf("Error: %s", err.Error())
 		os.Exit(1)
 	}
+
+	err = uiRunner.Run()
+	if err != nil {
+		fmt.Sprintf("Error: %s", err.Error())
+		os.Exit(1)
+	}
+
 	println("Goodbye!")
 }
