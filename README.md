@@ -2,6 +2,8 @@
 
 A simple interactive cli tool to handle your local git branches.
 
+![output](https://cloud.githubusercontent.com/assets/349328/26754564/3d113ce4-487d-11e7-86ba-a1b9d8a2dbbb.gif)
+
 I wrote it because normally I work with tons of local branches and I needed a better way to handle them than `git branch`.
 
 ## install
