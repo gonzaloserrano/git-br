@@ -2,7 +2,6 @@ package gitbr
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -21,15 +20,6 @@ type UIRunner interface {
 
 // Open returns an UIRunner from a git repository filesystem path.
 func Open(path string) (UIRunner, error) {
-	_, err := os.Stat(path + "/.git")
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-
-	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("no .git directory detected (needs to be in repository toplevel).")
-	}
-
 	repo, err := git.PlainOpen(path)
 	if err != nil {
 		return nil, err
