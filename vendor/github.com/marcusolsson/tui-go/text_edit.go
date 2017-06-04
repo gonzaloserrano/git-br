@@ -18,7 +18,7 @@ type TextEdit struct {
 	onTextChange func(*TextEdit)
 }
 
-// TextEdit returns a new TextEdit.
+// NewTextEdit returns a new TextEdit.
 func NewTextEdit() *TextEdit {
 	return &TextEdit{}
 }
@@ -54,21 +54,16 @@ func (e *TextEdit) SizeHint() image.Point {
 	return image.Point{max, e.heightForWidth(max)}
 }
 
-// OnEvent handles terminal events.
-func (e *TextEdit) OnEvent(ev Event) {
-	if !e.IsFocused() || ev.Type != EventKey {
+// OnKeyEvent handles terminal events.
+func (e *TextEdit) OnKeyEvent(ev KeyEvent) {
+	if !e.IsFocused() {
 		return
 	}
 
-	if ev.Key != 0 {
+	if ev.Key != KeyRune {
 		switch ev.Key {
 		case KeyEnter:
 			e.text = e.text + "\n"
-		case KeySpace:
-			e.text = e.text + string(' ')
-			if e.onTextChange != nil {
-				e.onTextChange(e)
-			}
 		case KeyBackspace2:
 			if len(e.text) > 0 {
 				e.text = trimRightLen(e.text, 1)
@@ -80,7 +75,7 @@ func (e *TextEdit) OnEvent(ev Event) {
 		return
 	}
 
-	e.text = e.text + string(ev.Ch)
+	e.text = e.text + string(ev.Rune)
 	if e.onTextChange != nil {
 		e.onTextChange(e)
 	}

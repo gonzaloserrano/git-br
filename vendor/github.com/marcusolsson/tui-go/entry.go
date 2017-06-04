@@ -61,22 +61,17 @@ func (e *Entry) SizeHint() image.Point {
 	return image.Point{10, 1}
 }
 
-// OnEvent handles terminal events.
-func (e *Entry) OnEvent(ev Event) {
-	if !e.IsFocused() || ev.Type != EventKey {
+// OnKeyEvent handles terminal events.
+func (e *Entry) OnKeyEvent(ev KeyEvent) {
+	if !e.IsFocused() {
 		return
 	}
 
-	if ev.Key != 0 {
+	if ev.Key != KeyRune {
 		switch ev.Key {
 		case KeyEnter:
 			if e.onSubmit != nil {
 				e.onSubmit(e)
-			}
-		case KeySpace:
-			e.text = e.text + string(' ')
-			if e.onTextChange != nil {
-				e.onTextChange(e)
 			}
 		case KeyBackspace2:
 			if len(e.text) > 0 {
@@ -89,7 +84,7 @@ func (e *Entry) OnEvent(ev Event) {
 		return
 	}
 
-	e.text = e.text + string(ev.Ch)
+	e.text = e.text + string(ev.Rune)
 	if e.onTextChange != nil {
 		e.onTextChange(e)
 	}

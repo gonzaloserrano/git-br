@@ -72,29 +72,27 @@ func (t *Table) Draw(p *Painter) {
 				style += ".selected"
 			}
 
-			p.WithStyle(style, func(p *Painter) {
-				pos := image.Point{i, j}
-				wp := t.mapCellToLocal(pos)
-				w := t.colWidths[i]
+			pos := image.Point{i, j}
+			wp := t.mapCellToLocal(pos)
 
-				p.FillRect(wp.X, wp.Y, w, 1)
-
-				if w, ok := t.cells[pos]; ok {
-					p.Translate(wp.X, wp.Y)
-					w.Draw(p)
-					p.Restore()
-				}
-			})
+			if w, ok := t.cells[pos]; ok {
+				p.Translate(wp.X, wp.Y)
+				w.Draw(p.WithMask(image.Rectangle{
+					Min: image.ZP,
+					Max: w.Size().Sub(image.Point{1, 1}),
+				}))
+				p.Restore()
+			}
 		}
 	}
 }
 
-// OnEvent handles an event and propagates it to all children.
-func (t *Table) OnEvent(ev Event) {
+// OnKeyEvent handles an event and propagates it to all children.
+func (t *Table) OnKeyEvent(ev KeyEvent) {
 	switch ev.Key {
-	case KeyArrowUp:
+	case KeyUp:
 		t.moveUp()
-	case KeyArrowDown:
+	case KeyDown:
 		t.moveDown()
 	case KeyEnter:
 		if t.onItemActivated != nil {
@@ -102,7 +100,7 @@ func (t *Table) OnEvent(ev Event) {
 		}
 	}
 
-	switch ev.Ch {
+	switch ev.Rune {
 	case 'k':
 		t.moveUp()
 	case 'j':
@@ -141,7 +139,9 @@ func (t *Table) Selected() int {
 // Select calls SetSelected and the OnSelectionChanged function.
 func (t *Table) Select(i int) {
 	t.SetSelected(i)
-	t.onSelectionChanged(t)
+	if t.onSelectionChanged != nil {
+		t.onSelectionChanged(t)
+	}
 }
 
 // OnItemActivated sets the function that is called when an item was activated.
