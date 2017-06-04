@@ -14,13 +14,13 @@ func main() {
 	}
 	uiRunner, err := gitbr.Open(path)
 	if err != nil {
-		fmt.Sprintf("Error: %s", err.Error())
+		fmt.Printf("Error: %s\n", err.Error())
 		os.Exit(1)
 	}
 
 	err = uiRunner.Run()
 	if err != nil {
-		fmt.Sprintf("Error: %s", err.Error())
+		fmt.Printf("Error: %s\n", err.Error())
 		os.Exit(1)
 	}
 
