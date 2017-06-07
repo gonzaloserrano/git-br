@@ -108,56 +108,53 @@ func extract(repo *git.Repository) (branches, error) {
 func newTuiUI(repo *git.Repository, brs branches) tui.UI {
 	t := tui.NewTable(0, 0)
 
-	t.SetColumnStretch(0, 1)
-	t.SetColumnStretch(1, 1)
-	t.SetColumnStretch(2, 2)
-
 	sortedBrs := brs.sort()
-
+	var brStr []string
 	for _, br := range sortedBrs {
-		author := br.Author.Name
-		if len(author) > 16 {
-			author = author[0:15] + "..."
-		}
-		name := br.Name
-		if len(name) > 26 {
-			name = name[0:25] + "..."
-		}
 		t.AppendRow(
 			tui.NewLabel(br.Author.When.String()[2:19]),
-			tui.NewLabel(author),
-			tui.NewLabel(name),
+			tui.NewLabel(br.Author.Name),
+			tui.NewLabel(br.Name),
 		)
+		brStr = append(brStr, br.String())
+
 	}
+	brStr = strings.Split(columnize.SimpleFormat(brStr), "\n")
+	l := tui.NewList()
+	l.AddItems(brStr...)
+	l.SetFocused(true)
 
 	diffView := tui.NewLabel("")
 
 	status := tui.NewStatusBar("")
 	status.SetText("[press enter to switch to selected branch]")
 	status.SetPermanentText("[press esc or q to quit]")
-	top := tui.NewHBox(t, diffView)
-	top.SetSizePolicy(tui.Preferred, tui.Preferred)
+	diffBox := tui.NewVBox(diffView, tui.NewSpacer())
+	diffBox.SetBorder(true)
+	tableBox := tui.NewVBox(l, tui.NewSpacer())
+	tableBox.SetBorder(true)
+	top := tui.NewHBox(tableBox, diffBox)
 	root := tui.NewVBox(
 		top,
-		tui.NewSpacer(),
 		status,
 	)
-	root.SetSizePolicy(tui.Preferred, tui.Preferred)
 
 	th := tui.NewTheme()
 	th.SetStyle("table.cell.selected", tui.Style{Bg: tui.ColorGreen, Fg: tui.ColorWhite})
+	th.SetStyle("list.item", tui.Style{Bg: tui.ColorBlack, Fg: tui.ColorWhite})
+	th.SetStyle("list.item.selected", tui.Style{Bg: tui.ColorGreen, Fg: tui.ColorWhite})
 
 	ui := tui.New(root)
 	ui.SetTheme(th)
-	ui.SetKeybinding(tui.KeyEsc, func() { ui.Quit() })
-	ui.SetKeybinding('q', func() { ui.Quit() })
-	t.OnItemActivated(func(t *tui.Table) {
+	ui.SetKeybinding("Esc", func() { ui.Quit() })
+	ui.SetKeybinding("q", func() { ui.Quit() })
+	l.OnItemActivated(func(l *tui.List) {
 		w, err := repo.Worktree()
 		if err != nil {
 			status.SetText(err.Error())
 			return
 		}
-		br := sortedBrs[t.Selected()]
+		br := sortedBrs[l.Selected()]
 		err = w.Checkout(&git.CheckoutOptions{
 			Branch: br.Branch,
 			Force:  true,
@@ -169,8 +166,8 @@ func newTuiUI(repo *git.Repository, brs branches) tui.UI {
 		}
 		status.SetText("switched to " + br.Name)
 	})
-	t.OnSelectionChanged(func(t *tui.Table) {
-		br := sortedBrs[t.Selected()]
+	l.OnSelectionChanged(func(l *tui.List) {
+		br := sortedBrs[l.Selected()]
 		fromBrName := "master"
 		if br.Name == fromBrName {
 			diffView.SetText("")
@@ -194,17 +191,18 @@ func newTuiUI(repo *git.Repository, brs branches) tui.UI {
 		}
 		diffView.SetText(changesMsg)
 	})
-	t.Select(0)
+	l.Select(0)
 
 	return ui
 }
 
 func changesToString(fromBrName string, changes object.Changes) string {
-	changesMsg := fmt.Sprintf("changes between %s and selected:\n\n", fromBrName)
+	changesMsg := fmt.Sprintf("changes against %s:\n\n", fromBrName)
 	if len(changes) > 30 {
 		changesMsg += "\ttoo many changes to display :-("
 		return changesMsg
 	}
+	var changesList []string
 	for _, c := range changes {
 		action, err := c.Action()
 		if err != nil {
@@ -223,8 +221,20 @@ func changesToString(fromBrName string, changes object.Changes) string {
 			actionStr = "M"
 			fileName = c.From.Name
 		}
-		changesMsg += fmt.Sprintf("\t%s: %s\n", actionStr, fileName)
+		changesList = append(changesList, fmt.Sprintf("    %s: %s", actionStr, fileName))
 	}
 
-	return changesMsg
+	sort.Strings(changesList)
+	var newList []string
+	var lastChar string
+	for i, c := range changesList {
+		firstChar := strings.TrimLeft(c, " ")[0:1]
+		if firstChar != lastChar && i > 0 {
+			newList = append(newList, "")
+		}
+		newList = append(newList, c)
+		lastChar = firstChar
+	}
+
+	return changesMsg + strings.Join(newList, "\n")
 }
