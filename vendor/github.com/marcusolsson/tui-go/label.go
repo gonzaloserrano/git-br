@@ -15,6 +15,11 @@ type Label struct {
 
 	text     string
 	wordWrap bool
+
+	// cache the result of SizeHint() (see #14)
+	cacheSizeHint *image.Point
+
+	styleName string
 }
 
 // NewLabel returns a new Label.
@@ -31,9 +36,17 @@ func (l *Label) Draw(p *Painter) {
 	if l.wordWrap {
 		lines = strings.Split(wordwrap.WrapString(l.text, uint(l.Size().X)), "\n")
 	}
-	for i, line := range lines {
-		p.DrawText(0, i, line)
+
+	style := "label"
+	if l.styleName != "" {
+		style += "." + l.styleName
 	}
+
+	p.WithStyle(style, func(p *Painter) {
+		for i, line := range lines {
+			p.DrawText(0, i, line)
+		}
+	})
 }
 
 // MinSizeHint returns the minimum size the widget is allowed to be.
@@ -43,6 +56,9 @@ func (l *Label) MinSizeHint() image.Point {
 
 // SizeHint returns the recommended size for the label.
 func (l *Label) SizeHint() image.Point {
+	if l.cacheSizeHint != nil {
+		return *l.cacheSizeHint
+	}
 	var max int
 	lines := strings.Split(l.text, "\n")
 	for _, line := range lines {
@@ -50,7 +66,9 @@ func (l *Label) SizeHint() image.Point {
 			max = w
 		}
 	}
-	return image.Point{max, l.heightForWidth(max)}
+	sizeHint := image.Point{max, l.heightForWidth(max)}
+	l.cacheSizeHint = &sizeHint
+	return sizeHint
 }
 
 func (l *Label) heightForWidth(w int) int {
@@ -59,10 +77,15 @@ func (l *Label) heightForWidth(w int) int {
 
 // SetText sets the text content of the label.
 func (l *Label) SetText(text string) {
+	l.cacheSizeHint = nil
 	l.text = text
 }
 
 // SetWordWrap sets whether text content should be wrapped.
 func (l *Label) SetWordWrap(enabled bool) {
 	l.wordWrap = enabled
+}
+
+func (l *Label) SetStyleName(style string) {
+	l.styleName = style
 }

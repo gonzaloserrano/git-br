@@ -11,7 +11,7 @@ type Padder struct {
 	padding image.Point
 }
 
-// Padder returns a new Padder.
+// NewPadder returns a new Padder.
 func NewPadder(x, y int, w Widget) *Padder {
 	return &Padder{
 		widget:  w,
@@ -52,10 +52,16 @@ func (p *Padder) Resize(size image.Point) {
 	p.widget.Resize(size.Sub(p.padding.Mul(2)))
 }
 
-func (p *Padder) OnEvent(ev Event) {
-	p.widget.OnEvent(ev)
+func (p *Padder) OnKeyEvent(ev KeyEvent) {
+	p.widget.OnKeyEvent(ev)
 }
 
+// SetFocused set the focus on the widget.
 func (p *Padder) SetFocused(f bool) {
 	p.widget.SetFocused(f)
+}
+
+// IsFocused returns true if the widget is focused.
+func (p *Padder) IsFocused() bool {
+	return p.widget.IsFocused()
 }

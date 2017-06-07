@@ -2,7 +2,7 @@
 
 A simple interactive cli tool to handle your local git branches.
 
-![output](https://cloud.githubusercontent.com/assets/349328/26754564/3d113ce4-487d-11e7-86ba-a1b9d8a2dbbb.gif)
+![output](https://user-images.githubusercontent.com/349328/26901406-116d2b6e-4bd6-11e7-8116-7bfa211cd25e.gif)
 
 I wrote it because normally I work with tons of local branches and I needed a better way to handle them than `git branch`.
 
@@ -18,13 +18,16 @@ Type `git br` in your repo or provide a path as a first argument.
 
 ## todo
 
-- [ ] use shift-enter to switch branch and quit
+- [ ] use colored labels for distinguish diff added, modified, deleted
+- [ ] if no path is passed, and we are not in the .git dir, look it up in the parent tree
+- [ ] display repo path
 - [ ] highlight master/develop branches
-- [ ] display file information, e.g diff with master
-- [ ] remove columnize dep
-- [ ] add live mode: use a goroutine to refresh branches
+- [ ] use enter to switch and quite, shift-enter to just switch
 - [ ] add delete feature
+- [ ] improve performance when moving between lines, add delay + cancelation
 - [ ] add delete all branches that are already merged feature
+- [ ] add live mode: use a goroutine to refresh branches
+- [ ] remove columnize dep
 
 ## license
 

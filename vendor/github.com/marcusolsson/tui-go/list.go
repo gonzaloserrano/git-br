@@ -48,15 +48,16 @@ func (l *List) SizeHint() image.Point {
 	return image.Point{width, len(l.items)}
 }
 
-func (l *List) OnEvent(ev Event) {
-	if !l.IsFocused() || ev.Type != EventKey {
+// OnKeyEvent handles terminal events.
+func (l *List) OnKeyEvent(ev KeyEvent) {
+	if !l.IsFocused() {
 		return
 	}
 
 	switch ev.Key {
-	case KeyArrowUp:
+	case KeyUp:
 		l.moveUp()
-	case KeyArrowDown:
+	case KeyDown:
 		l.moveDown()
 	case KeyEnter:
 		if l.onItemActivated != nil {
@@ -64,7 +65,7 @@ func (l *List) OnEvent(ev Event) {
 		}
 	}
 
-	switch ev.Ch {
+	switch ev.Rune {
 	case 'k':
 		l.moveUp()
 	case 'j':
@@ -102,9 +103,39 @@ func (l *List) AddItems(items ...string) {
 }
 
 func (l *List) RemoveItems() {
-       l.items = []string{}
-       l.pos = 0
-       l.selected = -1
+	l.items = []string{}
+	l.pos = 0
+	l.selected = -1
+	if l.onSelectionChanged != nil {
+		l.onSelectionChanged(l)
+	}
+}
+
+func (l *List) RemoveItem(i int) {
+	// Adjust pos and selected before removing.
+	if l.pos >= len(l.items) {
+		l.pos--
+	}
+	if l.selected == i {
+		l.selected = -1
+	} else if l.selected > i {
+		l.selected--
+	}
+
+	// Copy items following i to position i.
+	copy(l.items[i:], l.items[i+1:])
+
+	// Shrink items by one.
+	l.items[len(l.items)-1] = ""
+	l.items = l.items[:len(l.items)-1]
+
+	if l.onSelectionChanged != nil {
+		l.onSelectionChanged(l)
+	}
+}
+
+func (l *List) Length() int {
+	return len(l.items)
 }
 
 func (l *List) SetSelected(i int) {
@@ -113,6 +144,14 @@ func (l *List) SetSelected(i int) {
 
 func (l *List) Selected() int {
 	return l.selected
+}
+
+// Select calls SetSelected and the OnSelectionChanged function.
+func (l *List) Select(i int) {
+	l.SetSelected(i)
+	if l.onSelectionChanged != nil {
+		l.onSelectionChanged(l)
+	}
 }
 
 func (l *List) SelectedItem() string {

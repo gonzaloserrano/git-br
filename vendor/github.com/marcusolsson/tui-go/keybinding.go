@@ -1,11 +1,14 @@
 package tui
 
+import (
+	"strings"
+)
+
 type Keybinding struct {
-	Key     Key
-	Ch      rune
-	Handler func()
+	Sequence string
+	Handler  func()
 }
 
-func (b *Keybinding) Match(ev Event) bool {
-	return (b.Key == ev.Key) && (b.Ch == ev.Ch)
+func (b *Keybinding) Match(ev KeyEvent) bool {
+	return strings.ToLower(b.Sequence) == strings.ToLower(ev.Name())
 }
