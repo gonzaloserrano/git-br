@@ -61,6 +61,9 @@ func (l *Label) SizeHint() image.Point {
 	}
 	var max int
 	lines := strings.Split(l.text, "\n")
+	if l.wordWrap {
+		lines = strings.Split(wordwrap.WrapString(l.text, uint(l.Size().X)), "\n")
+	}
 	for _, line := range lines {
 		if w := stringWidth(line); w > max {
 			max = w
@@ -75,6 +78,11 @@ func (l *Label) heightForWidth(w int) int {
 	return len(strings.Split(wordwrap.WrapString(l.text, uint(w)), "\n"))
 }
 
+// Text returns the text content of the label.
+func (l *Label) Text() string {
+	return l.text
+}
+
 // SetText sets the text content of the label.
 func (l *Label) SetText(text string) {
 	l.cacheSizeHint = nil
@@ -86,6 +94,7 @@ func (l *Label) SetWordWrap(enabled bool) {
 	l.wordWrap = enabled
 }
 
+// SetStyleName sets the identifier used for custom styling.
 func (l *Label) SetStyleName(style string) {
 	l.styleName = style
 }

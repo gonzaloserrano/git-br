@@ -8,6 +8,7 @@ import (
 type Surface interface {
 	SetCell(x, y int, ch rune, s Style)
 	SetCursor(x, y int)
+	HideCursor()
 	Begin()
 	End()
 	Size() image.Point
@@ -15,7 +16,7 @@ type Surface interface {
 
 // Painter provides operations to paint on a surface.
 type Painter struct {
-	Theme *Theme
+	theme *Theme
 
 	// Surface to paint on.
 	surface Surface
@@ -32,9 +33,13 @@ type Painter struct {
 // NewPainter returns a new instance of Painter.
 func NewPainter(s Surface, p *Theme) *Painter {
 	return &Painter{
-		Theme:   p,
+		theme:   p,
 		surface: s,
 		style:   p.Style("normal"),
+		mask: image.Rectangle{
+			Min: image.ZP,
+			Max: s.Size(),
+		},
 	}
 }
 
@@ -62,12 +67,20 @@ func (p *Painter) End() {
 
 // Repaint clears the surface, draws the scene and flushes it.
 func (p *Painter) Repaint(w Widget) {
+	p.mask = image.Rectangle{
+		Min: image.ZP,
+		Max: p.surface.Size(),
+	}
+
+	p.surface.HideCursor()
+
 	p.Begin()
 	w.Resize(p.surface.Size())
 	w.Draw(p)
 	p.End()
 }
 
+// DrawCursor draws the cursor at the given position.
 func (p *Painter) DrawCursor(x, y int) {
 	wp := p.mapLocalToWorld(image.Point{x, y})
 	p.surface.SetCursor(wp.X, wp.Y)
@@ -75,15 +88,10 @@ func (p *Painter) DrawCursor(x, y int) {
 
 // DrawRune paints a rune at the given coordinate.
 func (p *Painter) DrawRune(x, y int, r rune) {
-	// If a mask is set, only draw if the mask contains the coordinate.
-	if p.mask != image.ZR {
-		if (x < p.mask.Min.X) || (x > p.mask.Max.X) ||
-			(y < p.mask.Min.Y) || (y > p.mask.Max.Y) {
-			return
-		}
-	}
 	wp := p.mapLocalToWorld(image.Point{x, y})
-	p.surface.SetCell(wp.X, wp.Y, r, p.style)
+	if (p.mask.Min.X <= wp.X) && (wp.X < p.mask.Max.X) && (p.mask.Min.Y <= wp.Y) && (wp.Y < p.mask.Max.Y) {
+		p.surface.SetCell(wp.X, wp.Y, r, p.style)
+	}
 }
 
 // DrawText paints a string starting at the given coordinate.
@@ -94,19 +102,21 @@ func (p *Painter) DrawText(x, y int, text string) {
 	}
 }
 
+// DrawHorizontalLine paints a horizontal line using box characters.
 func (p *Painter) DrawHorizontalLine(x1, x2, y int) {
 	for x := x1; x < x2; x++ {
 		p.DrawRune(x, y, '─')
 	}
 }
 
+// DrawVerticalLine paints a vertical line using box characters.
 func (p *Painter) DrawVerticalLine(x, y1, y2 int) {
 	for y := y1; y < y2; y++ {
 		p.DrawRune(x, y, '│')
 	}
 }
 
-// DrawRect paints a rectangle.
+// DrawRect paints a rectangle using box characters.
 func (p *Painter) DrawRect(x, y, w, h int) {
 	for j := 0; j < h; j++ {
 		for i := 0; i < w; i++ {
@@ -131,6 +141,7 @@ func (p *Painter) DrawRect(x, y, w, h int) {
 	}
 }
 
+// FillRect clears a rectangular area with whitespace.
 func (p *Painter) FillRect(x, y, w, h int) {
 	for j := 0; j < h; j++ {
 		for i := 0; i < w; i++ {
@@ -139,23 +150,39 @@ func (p *Painter) FillRect(x, y, w, h int) {
 	}
 }
 
+// SetStyle sets the style used when painting.
 func (p *Painter) SetStyle(s Style) {
 	p.style = s
 }
 
+// RestoreStyle clears any style and restores it to the default.
 func (p *Painter) RestoreStyle() {
-	p.SetStyle(p.Theme.Style("normal"))
+	p.SetStyle(p.theme.Style("normal"))
 }
 
+// WithStyle decorates the painter with the style associated with an identifier.
 func (p *Painter) WithStyle(n string, fn func(*Painter)) {
-	p.SetStyle(p.Theme.Style(n))
+	if !p.theme.HasStyle(n) {
+		fn(p)
+		return
+	}
+
+	p.SetStyle(p.theme.Style(n))
 	fn(p)
 	p.RestoreStyle()
 }
 
-func (p *Painter) WithMask(r image.Rectangle) *Painter {
-	p.mask = r
-	return p
+// WithMask masks a painter to restrict painting within the given rectangle.
+func (p *Painter) WithMask(r image.Rectangle, fn func(*Painter)) {
+	tmp := p.mask
+	defer func() { p.mask = tmp }()
+
+	p.mask = p.mask.Intersect(image.Rectangle{
+		Min: p.mapLocalToWorld(r.Min),
+		Max: p.mapLocalToWorld(r.Max),
+	})
+
+	fn(p)
 }
 
 func (p *Painter) mapLocalToWorld(point image.Point) image.Point {

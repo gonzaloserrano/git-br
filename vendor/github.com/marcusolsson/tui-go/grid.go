@@ -87,17 +87,19 @@ func (g *Grid) Draw(p *Painter) {
 
 			if w, ok := g.cells[pos]; ok {
 				p.Translate(wp.X, wp.Y)
-				w.Draw(p.WithMask(image.Rectangle{
+				p.WithMask(image.Rectangle{
 					Min: image.ZP,
-					Max: w.Size().Sub(image.Point{1, 1}),
-				}))
+					Max: w.Size(),
+				}, func(p *Painter) {
+					w.Draw(p)
+				})
 				p.Restore()
 			}
 		}
 	}
 }
 
-// MinSizeHint returns the minimum size the widget is allowed to be.
+// MinSizeHint returns the minimum size hint for the grid.
 func (g *Grid) MinSizeHint() image.Point {
 	if g.cols == 0 || g.rows == 0 {
 		return image.Point{}
@@ -121,7 +123,7 @@ func (g *Grid) MinSizeHint() image.Point {
 	return image.Point{width, height}
 }
 
-// SizeHint returns the recommended size for the grid.
+// SizeHint returns the recommended size hint for the grid.
 func (g *Grid) SizeHint() image.Point {
 	if g.cols == 0 || g.rows == 0 {
 		return image.Point{}
@@ -145,6 +147,12 @@ func (g *Grid) SizeHint() image.Point {
 	return image.Point{width, height}
 }
 
+// Resize recursively updates the size of the Grid and all the widgets it
+// contains. This is a potentially expensive operation and should be invoked
+// with restraint.
+//
+// Resize is called by the layout engine and is not intended to be used by end
+// users.
 func (g *Grid) Resize(size image.Point) {
 	g.size = size
 	inner := g.size
@@ -166,11 +174,21 @@ func (g *Grid) layoutChildren(size image.Point) {
 
 func (g *Grid) doLayout(space int, a Alignment) []int {
 	var sizes []int
+	var stretch map[int]int
 
 	if a == Horizontal {
 		sizes = make([]int, g.cols)
+		stretch = g.columnStretch
 	} else if a == Vertical {
 		sizes = make([]int, g.rows)
+		stretch = g.rowStretch
+	}
+
+	var nonZeroStretchFactors int
+	for _, s := range stretch {
+		if s > 0 {
+			nonZeroStretchFactors++
+		}
 	}
 
 	remaining := space
@@ -179,6 +197,10 @@ func (g *Grid) doLayout(space int, a Alignment) []int {
 	for {
 		var changed bool
 		for i, sz := range sizes {
+			if stretch[i] > 0 {
+				continue
+			}
+
 			ws := g.rowcol(i, a)
 			var sizeHint int
 			for _, w := range ws {
@@ -205,6 +227,10 @@ func (g *Grid) doLayout(space int, a Alignment) []int {
 	for {
 		var changed bool
 		for i, sz := range sizes {
+			if stretch[i] > 0 {
+				continue
+			}
+
 			ws := g.rowcol(i, a)
 			var sizeHint int
 			for _, w := range ws {
@@ -231,20 +257,37 @@ func (g *Grid) doLayout(space int, a Alignment) []int {
 	// Distribute remaining space
 	for {
 		var changed bool
-		min := math.MaxInt8
-		for _, sz := range sizes {
-			if sz < min {
-				min = sz
-			}
-		}
-		for i, sz := range sizes {
-			if sz == min {
-				sizes[i] = sz + 1
-				remaining--
-				if remaining <= 0 {
-					goto Resize
+		if nonZeroStretchFactors == 0 {
+			min := math.MaxInt8
+			for _, sz := range sizes {
+				if sz < min {
+					min = sz
 				}
-				changed = true
+			}
+			for i, sz := range sizes {
+				if sz == min {
+					sizes[i] = sz + 1
+					remaining--
+					if remaining <= 0 {
+						goto Resize
+					}
+					changed = true
+				}
+			}
+		} else {
+			for i, sz := range sizes {
+				s := stretch[i]
+				if s > 0 {
+					if remaining-s < 0 {
+						s = remaining
+					}
+					sizes[i] = sz + s
+					remaining -= s
+					if remaining <= 0 {
+						goto Resize
+					}
+					changed = true
+				}
 			}
 		}
 		if !changed {
@@ -265,68 +308,6 @@ func (g *Grid) rowcol(i int, a Alignment) []Widget {
 		}
 	}
 	return cells
-}
-
-func (g *Grid) distributeRowHeight(available image.Point) []int {
-	rows := make([]int, g.rows)
-
-	// Distribute minimum space.
-	for i := 0; i < g.rows; i++ {
-		rows[i] = g.minRowHeight(i)
-	}
-
-	var used int
-	for _, h := range rows {
-		used += h
-	}
-
-	// Distribute remaining space (if any).
-	extra := available.Y - used
-
-	// Distribute preferred space
-K:
-	for extra > 0 {
-		starting := extra
-		for i, h := range rows {
-			hint := g.rowHeight(i)
-			if h < hint {
-				rows[i] = h + 1
-				extra--
-
-				if extra == 0 {
-					break K
-				}
-			}
-		}
-		if starting == extra {
-			break K
-		}
-	}
-
-	// Distribute surplus space.
-L:
-	for extra > 0 {
-		starting := extra
-		for i, h := range rows {
-			if s, ok := g.rowStretch[i]; ok && s > 0 {
-				if extra > s {
-					rows[i] = h + s
-					extra -= s
-				} else {
-					rows[i] = h + extra
-					extra -= extra
-				}
-				if extra == 0 {
-					break L
-				}
-			}
-		}
-		if starting == extra {
-			break L
-		}
-	}
-
-	return rows
 }
 
 func (g *Grid) mapCellToLocal(p image.Point) image.Point {
@@ -434,6 +415,28 @@ func (g *Grid) AppendRow(row ...Widget) {
 		pos := image.Point{i, g.rows - 1}
 		g.SetCell(pos, cell)
 	}
+}
+
+// RemoveRow removes the row ( at index ) from the grid
+func (g *Grid) RemoveRow(index int) {
+	if index < g.rows {
+		g.rows--
+		for i := index; i <= g.rows; i++ {
+			for j := 0; j < g.cols; j++ {
+				if i == g.rows {
+					delete(g.cells, image.Point{j, g.rows})
+				} else {
+					g.cells[image.Point{j, i}] = g.cells[image.Point{j, i + 1}]
+				}
+			}
+		}
+	}
+}
+
+// RemoveRows will remove all the rows in grid
+func (g *Grid) RemoveRows() {
+	g.rows = 0
+	g.cells = make(map[image.Point]Widget)
 }
 
 // SetColumnStretch sets the stretch factor for a given column. If stretch > 0,

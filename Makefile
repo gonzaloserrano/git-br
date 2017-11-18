@@ -6,7 +6,7 @@ test:
 	go test -v $(PACKAGES)
 
 build:
-	go build cmd/git-br/git-br.go
+	cd cmd/git-br && go build .
 
 lint:
 	$(FGT) go fmt $(PACKAGES)

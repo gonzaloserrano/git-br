@@ -6,8 +6,10 @@ import (
 	"strings"
 )
 
+// ModMask is a mask of modifier keys.
 type ModMask int16
 
+// Modifiers that can be sent with a KeyEvent or a MouseEvent.
 const (
 	ModShift ModMask = 1 << iota
 	ModCtrl
@@ -16,12 +18,14 @@ const (
 	ModNone ModMask = 0
 )
 
+// KeyEvent represents a key press.
 type KeyEvent struct {
 	Key       Key
 	Rune      rune
 	Modifiers ModMask
 }
 
+// Name returns a user-friendly description of the key press.
 func (ev *KeyEvent) Name() string {
 	s := ""
 	m := []string{}
@@ -55,8 +59,11 @@ func (ev *KeyEvent) Name() string {
 	return s
 }
 
+// Key represents both normal and special keys. For normal letters, KeyRune is
+// used together with the Rune field in the KeyEvent.
 type Key int16
 
+// These are named keys that can be handled.
 const (
 	KeyRune Key = iota + 256
 	KeyUp
@@ -147,6 +154,7 @@ const (
 	KeyF64
 )
 
+// These are the supported control keys.
 const (
 	KeyCtrlSpace Key = iota
 	KeyCtrlA
@@ -182,6 +190,7 @@ const (
 	KeyCtrlUnderscore
 )
 
+// These are the defined ASCII values for key codes.
 const (
 	KeyNUL Key = iota
 	KeySOH
@@ -218,6 +227,7 @@ const (
 	KeyDEL Key = 0x7F
 )
 
+// These are aliases for other keys.
 const (
 	KeyBackspace  = KeyBS
 	KeyTab        = KeyTAB
@@ -228,48 +238,139 @@ const (
 )
 
 var keyNames = map[Key]string{
-	KeyEnter:      "Enter",
-	KeyBackspace:  "Backspace",
-	KeyTab:        "Tab",
-	KeyBacktab:    "Backtab",
-	KeyEsc:        "Esc",
-	KeyBackspace2: "Backspace2",
-	KeyDelete:     "Delete",
-	KeyInsert:     "Insert",
-	KeyUp:         "Up",
-	KeyDown:       "Down",
-	KeyLeft:       "Left",
-	KeyRight:      "Right",
-	KeyCtrlSpace:  "Ctrl-Space",
-	KeyCtrlA:      "Ctrl-A",
-	KeyCtrlB:      "Ctrl-B",
-	KeyCtrlC:      "Ctrl-C",
-	KeyCtrlD:      "Ctrl-D",
-	KeyCtrlE:      "Ctrl-E",
-	KeyCtrlF:      "Ctrl-F",
-	KeyCtrlG:      "Ctrl-G",
-	KeyCtrlJ:      "Ctrl-J",
-	KeyCtrlK:      "Ctrl-K",
-	KeyCtrlL:      "Ctrl-L",
-	KeyCtrlN:      "Ctrl-N",
-	KeyCtrlO:      "Ctrl-O",
-	KeyCtrlP:      "Ctrl-P",
-	KeyCtrlQ:      "Ctrl-Q",
-	KeyCtrlR:      "Ctrl-R",
-	KeyCtrlS:      "Ctrl-S",
-	KeyCtrlT:      "Ctrl-T",
-	KeyCtrlU:      "Ctrl-U",
-	KeyCtrlV:      "Ctrl-V",
-	KeyCtrlW:      "Ctrl-W",
-	KeyCtrlX:      "Ctrl-X",
-	KeyCtrlY:      "Ctrl-Y",
-	KeyCtrlZ:      "Ctrl-Z",
+	KeyEnter:          "Enter",
+	KeyBackspace:      "Backspace",
+	KeyTab:            "Tab",
+	KeyBacktab:        "Backtab",
+	KeyEsc:            "Esc",
+	KeyBackspace2:     "Backspace2",
+	KeyInsert:         "Insert",
+	KeyDelete:         "Delete",
+	KeyHelp:           "Help",
+	KeyUp:             "Up",
+	KeyDown:           "Down",
+	KeyLeft:           "Left",
+	KeyRight:          "Right",
+	KeyHome:           "Home",
+	KeyEnd:            "End",
+	KeyUpLeft:         "UpLeft",
+	KeyUpRight:        "UpRight",
+	KeyDownLeft:       "DownLeft",
+	KeyDownRight:      "DownRight",
+	KeyCenter:         "Center",
+	KeyPgDn:           "PgDn",
+	KeyPgUp:           "PgUp",
+	KeyClear:          "Clear",
+	KeyExit:           "Exit",
+	KeyCancel:         "Cancel",
+	KeyPause:          "Pause",
+	KeyPrint:          "Print",
+	KeyF1:             "F1",
+	KeyF2:             "F2",
+	KeyF3:             "F3",
+	KeyF4:             "F4",
+	KeyF5:             "F5",
+	KeyF6:             "F6",
+	KeyF7:             "F7",
+	KeyF8:             "F8",
+	KeyF9:             "F9",
+	KeyF10:            "F10",
+	KeyF11:            "F11",
+	KeyF12:            "F12",
+	KeyF13:            "F13",
+	KeyF14:            "F14",
+	KeyF15:            "F15",
+	KeyF16:            "F16",
+	KeyF17:            "F17",
+	KeyF18:            "F18",
+	KeyF19:            "F19",
+	KeyF20:            "F20",
+	KeyF21:            "F21",
+	KeyF22:            "F22",
+	KeyF23:            "F23",
+	KeyF24:            "F24",
+	KeyF25:            "F25",
+	KeyF26:            "F26",
+	KeyF27:            "F27",
+	KeyF28:            "F28",
+	KeyF29:            "F29",
+	KeyF30:            "F30",
+	KeyF31:            "F31",
+	KeyF32:            "F32",
+	KeyF33:            "F33",
+	KeyF34:            "F34",
+	KeyF35:            "F35",
+	KeyF36:            "F36",
+	KeyF37:            "F37",
+	KeyF38:            "F38",
+	KeyF39:            "F39",
+	KeyF40:            "F40",
+	KeyF41:            "F41",
+	KeyF42:            "F42",
+	KeyF43:            "F43",
+	KeyF44:            "F44",
+	KeyF45:            "F45",
+	KeyF46:            "F46",
+	KeyF47:            "F47",
+	KeyF48:            "F48",
+	KeyF49:            "F49",
+	KeyF50:            "F50",
+	KeyF51:            "F51",
+	KeyF52:            "F52",
+	KeyF53:            "F53",
+	KeyF54:            "F54",
+	KeyF55:            "F55",
+	KeyF56:            "F56",
+	KeyF57:            "F57",
+	KeyF58:            "F58",
+	KeyF59:            "F59",
+	KeyF60:            "F60",
+	KeyF61:            "F61",
+	KeyF62:            "F62",
+	KeyF63:            "F63",
+	KeyF64:            "F64",
+	KeyCtrlUnderscore: "Ctrl-_",
+	KeyCtrlRightSq:    "Ctrl-]",
+	KeyCtrlBackslash:  "Ctrl-\\",
+	KeyCtrlCarat:      "Ctrl-^",
+	KeyCtrlSpace:      "Ctrl-Space",
+	KeyCtrlA:          "Ctrl-A",
+	KeyCtrlB:          "Ctrl-B",
+	KeyCtrlC:          "Ctrl-C",
+	KeyCtrlD:          "Ctrl-D",
+	KeyCtrlE:          "Ctrl-E",
+	KeyCtrlF:          "Ctrl-F",
+	KeyCtrlG:          "Ctrl-G",
+	KeyCtrlJ:          "Ctrl-J",
+	KeyCtrlK:          "Ctrl-K",
+	KeyCtrlL:          "Ctrl-L",
+	KeyCtrlN:          "Ctrl-N",
+	KeyCtrlO:          "Ctrl-O",
+	KeyCtrlP:          "Ctrl-P",
+	KeyCtrlQ:          "Ctrl-Q",
+	KeyCtrlR:          "Ctrl-R",
+	KeyCtrlS:          "Ctrl-S",
+	KeyCtrlT:          "Ctrl-T",
+	KeyCtrlU:          "Ctrl-U",
+	KeyCtrlV:          "Ctrl-V",
+	KeyCtrlW:          "Ctrl-W",
+	KeyCtrlX:          "Ctrl-X",
+	KeyCtrlY:          "Ctrl-Y",
+	KeyCtrlZ:          "Ctrl-Z",
 }
 
+// MouseEvent represents the event where a mouse button was pressed or
+// released.
 type MouseEvent struct {
 	Pos image.Point
 }
 
-type PaintEvent struct{}
+type paintEvent struct{}
 
-type Event interface{}
+// callbackEvent holds a user-defined function which has been submitted
+// to be called on the render thread.
+type callbackEvent struct {
+	cbFn func()
+}
+
+type event interface{}

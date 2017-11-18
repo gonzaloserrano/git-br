@@ -2,22 +2,21 @@ package tui
 
 import (
 	"image"
-	"strings"
-
-	wordwrap "github.com/mitchellh/go-wordwrap"
 )
 
 var _ Widget = &Entry{}
 
-// Entry is a one-line text editor. It lets the user supply your application
-// with text, e.g. to input user and password information.
+// Entry is a one-line text editor. It lets the user supply the application
+// with text, e.g., to input user and password information.
 type Entry struct {
 	WidgetBase
 
-	text string
+	text RuneBuffer
 
 	onTextChange func(*Entry)
 	onSubmit     func(*Entry)
+
+	offset int
 }
 
 // NewEntry returns a new Entry.
@@ -33,39 +32,33 @@ func (e *Entry) Draw(p *Painter) {
 	}
 	p.WithStyle(style, func(p *Painter) {
 		s := e.Size()
+		e.text.SetMaxWidth(s.X)
 
-		tw := stringWidth(e.text)
-		offx := tw - s.X
-
-		// Make room for cursor.
-		if e.IsFocused() {
-			offx++
-		}
-
-		text := e.text
-		if tw >= s.X {
-			text = text[offx:]
-		}
+		text := e.visibleText()
 
 		p.FillRect(0, 0, s.X, 1)
 		p.DrawText(0, 0, text)
 
 		if e.IsFocused() {
-			p.DrawCursor(stringWidth(text), 0)
+			pos := e.text.CursorPos()
+			p.DrawCursor(pos.X-e.offset, 0)
 		}
 	})
 }
 
-// SizeHint returns the recommended size for the entry.
+// SizeHint returns the recommended size hint for the entry.
 func (e *Entry) SizeHint() image.Point {
 	return image.Point{10, 1}
 }
 
-// OnKeyEvent handles terminal events.
+// OnKeyEvent handles key events.
 func (e *Entry) OnKeyEvent(ev KeyEvent) {
 	if !e.IsFocused() {
 		return
 	}
+
+	screenWidth := e.Size().X
+	e.text.SetMaxWidth(screenWidth)
 
 	if ev.Key != KeyRune {
 		switch ev.Key {
@@ -74,17 +67,51 @@ func (e *Entry) OnKeyEvent(ev KeyEvent) {
 				e.onSubmit(e)
 			}
 		case KeyBackspace2:
-			if len(e.text) > 0 {
-				e.text = trimRightLen(e.text, 1)
-				if e.onTextChange != nil {
-					e.onTextChange(e)
-				}
+			e.text.Backspace()
+			if e.offset > 0 && !e.isTextRemaining() {
+				e.offset--
 			}
+			if e.onTextChange != nil {
+				e.onTextChange(e)
+			}
+		case KeyDelete, KeyCtrlD:
+			e.text.Delete()
+			if e.onTextChange != nil {
+				e.onTextChange(e)
+			}
+		case KeyLeft, KeyCtrlB:
+			e.text.MoveBackward()
+			if e.offset > 0 {
+				e.offset--
+			}
+		case KeyRight, KeyCtrlF:
+			e.text.MoveForward()
+
+			isCursorTooFar := e.text.CursorPos().X >= screenWidth
+			isTextLeft := (e.text.Width() - e.offset) > (screenWidth - 1)
+
+			if isCursorTooFar && isTextLeft {
+				e.offset++
+			}
+		case KeyHome, KeyCtrlA:
+			e.text.MoveToLineStart()
+			e.offset = 0
+		case KeyEnd, KeyCtrlE:
+			e.text.MoveToLineEnd()
+			left := e.text.Width() - (screenWidth - 1)
+			if left >= 0 {
+				e.offset = left
+			}
+		case KeyCtrlK:
+			e.text.Kill()
 		}
 		return
 	}
 
-	e.text = e.text + string(ev.Rune)
+	e.text.WriteRune(ev.Rune)
+	if e.text.CursorPos().X >= screenWidth {
+		e.offset++
+	}
 	if e.onTextChange != nil {
 		e.onTextChange(e)
 	}
@@ -104,14 +131,27 @@ func (e *Entry) OnSubmit(fn func(entry *Entry)) {
 
 // SetText sets the text content of the entry.
 func (e *Entry) SetText(text string) {
-	e.text = text
+	e.text.Set([]rune(text))
 }
 
 // Text returns the text content of the entry.
 func (e *Entry) Text() string {
-	return e.text
+	return e.text.String()
 }
 
-func (e *Entry) heightForWidth(w int) int {
-	return len(strings.Split(wordwrap.WrapString(e.text, uint(w)), "\n"))
+func (e *Entry) visibleText() string {
+	text := e.text.String()
+	if text == "" {
+		return ""
+	}
+	windowStart := e.offset
+	windowEnd := e.Size().X + windowStart
+	if windowEnd > len(text) {
+		windowEnd = len(text)
+	}
+	return text[windowStart:windowEnd]
+}
+
+func (e *Entry) isTextRemaining() bool {
+	return e.text.Width()-e.offset > e.Size().X
 }

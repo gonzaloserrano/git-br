@@ -16,7 +16,9 @@ const (
 	Vertical
 )
 
-// Box is a layout for placing widgets.
+// Box is a layout for placing widgets either horizontally or vertically. If
+// horizontally, all widgets will have the same height. If vertically, they
+// will all have the same width.
 type Box struct {
 	WidgetBase
 
@@ -28,7 +30,7 @@ type Box struct {
 	alignment Alignment
 }
 
-// NewVBox returns a new vertical Box.
+// NewVBox returns a new vertically aligned Box.
 func NewVBox(c ...Widget) *Box {
 	return &Box{
 		children:  c,
@@ -36,7 +38,7 @@ func NewVBox(c ...Widget) *Box {
 	}
 }
 
-// NewHBox returns a new horizontal Box.
+// NewHBox returns a new horizontally aligned Box.
 func NewHBox(c ...Widget) *Box {
 	return &Box{
 		children:  c,
@@ -44,9 +46,34 @@ func NewHBox(c ...Widget) *Box {
 	}
 }
 
-// Append adds a new widget to the layout.
+// Append adds the given widget at the end of the Box.
 func (b *Box) Append(w Widget) {
 	b.children = append(b.children, w)
+}
+
+// Prepend adds the given widget at the start of the Box.
+func (b *Box) Prepend(w Widget) {
+	b.children = append([]Widget{w}, b.children...)
+}
+
+// Insert adds the widget into the Box at a given index.
+func (b *Box) Insert(i int, w Widget) {
+	if len(b.children) < i || i < 0 {
+		return
+	}
+
+	b.children = append(b.children, nil)
+	copy(b.children[i+1:], b.children[i:])
+	b.children[i] = w
+}
+
+// Remove deletes the widget from the Box at a given index.
+func (b *Box) Remove(i int) {
+	if len(b.children) < i {
+		return
+	}
+
+	b.children = append(b.children[:i], b.children[i+1:]...)
 }
 
 // SetBorder sets whether the border is visible or not.
@@ -59,7 +86,7 @@ func (b *Box) SetTitle(title string) {
 	b.title = title
 }
 
-// Alignment returns the currently set alignment or the Box.
+// Alignment returns the current alignment of the Box.
 func (b *Box) Alignment() Alignment {
 	return b.alignment
 }
@@ -74,7 +101,7 @@ func (b *Box) IsFocused() bool {
 	return false
 }
 
-// Draw recursively draws the children it contains.
+// Draw recursively draws the widgets it contains.
 func (b *Box) Draw(p *Painter) {
 	style := "box"
 	if b.IsFocused() {
@@ -84,11 +111,14 @@ func (b *Box) Draw(p *Painter) {
 	sz := b.Size()
 
 	if b.border {
-		p.WithStyle(style, func(p *Painter) {
+		p.WithStyle(style+".border", func(p *Painter) {
 			p.DrawRect(0, 0, sz.X, sz.Y)
-			p.WithMask(image.Rect(2, 0, sz.X-3, 0)).DrawText(2, 0, b.title)
 		})
-
+		p.WithStyle(style, func(p *Painter) {
+			p.WithMask(image.Rect(0, 0, sz.X-1, 1), func(p *Painter) {
+				p.DrawText(1, 0, b.title)
+			})
+		})
 		p.Translate(1, 1)
 		defer p.Restore()
 	}
@@ -102,10 +132,12 @@ func (b *Box) Draw(p *Painter) {
 			p.Translate(0, off.Y)
 		}
 
-		child.Draw(p.WithMask(image.Rectangle{
+		p.WithMask(image.Rectangle{
 			Min: image.ZP,
-			Max: child.Size().Sub(image.Point{1, 1}),
-		}))
+			Max: child.Size(),
+		}, func(p *Painter) {
+			child.Draw(p)
+		})
 
 		p.Restore()
 
@@ -113,7 +145,7 @@ func (b *Box) Draw(p *Painter) {
 	}
 }
 
-// MinSizeHint returns the minimum size for the layout.
+// MinSizeHint returns the minimum size hint for the layout.
 func (b *Box) MinSizeHint() image.Point {
 	var minSize image.Point
 
@@ -139,7 +171,7 @@ func (b *Box) MinSizeHint() image.Point {
 	return minSize
 }
 
-// SizeHint returns the recommended size for the layout.
+// SizeHint returns the recommended size hint for the layout.
 func (b *Box) SizeHint() image.Point {
 	var sizeHint image.Point
 
@@ -172,7 +204,12 @@ func (b *Box) OnKeyEvent(ev KeyEvent) {
 	}
 }
 
-// Resize updates the size of the layout.
+// Resize recursively updates the size of the Box and all the widgets it
+// contains. This is a potentially expensive operation and should be invoked
+// with restraint.
+//
+// Resize is called by the layout engine and is not intended to be used by end
+// users.
 func (b *Box) Resize(size image.Point) {
 	b.size = size
 	inner := b.size

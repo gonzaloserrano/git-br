@@ -6,23 +6,21 @@ import (
 	"github.com/gdamore/tcell"
 )
 
-var Repaint = func() {}
-
 var _ UI = &tcellUI{}
 
 type tcellUI struct {
 	painter *Painter
 	root    Widget
 
-	keybindings []*Keybinding
+	keybindings []*keybinding
 
 	quit chan struct{}
 
 	screen tcell.Screen
 
-	kbFocus *KbFocusController
+	kbFocus *kbFocusController
 
-	eventQueue chan Event
+	eventQueue chan event
 }
 
 func newTcellUI(root Widget) (*tcellUI, error) {
@@ -39,11 +37,11 @@ func newTcellUI(root Widget) (*tcellUI, error) {
 	return &tcellUI{
 		painter:     p,
 		root:        root,
-		keybindings: make([]*Keybinding, 0),
+		keybindings: make([]*keybinding, 0),
 		quit:        make(chan struct{}, 1),
 		screen:      screen,
-		kbFocus:     &KbFocusController{chain: DefaultFocusChain},
-		eventQueue:  make(chan Event, 1),
+		kbFocus:     &kbFocusController{chain: DefaultFocusChain},
+		eventQueue:  make(chan event, 1),
 	}, nil
 }
 
@@ -51,8 +49,8 @@ func (ui *tcellUI) SetWidget(w Widget) {
 	ui.root = w
 }
 
-func (ui *tcellUI) SetTheme(p *Theme) {
-	ui.painter.Theme = p
+func (ui *tcellUI) SetTheme(t *Theme) {
+	ui.painter.theme = t
 }
 
 func (ui *tcellUI) SetFocusChain(chain FocusChain) {
@@ -60,9 +58,9 @@ func (ui *tcellUI) SetFocusChain(chain FocusChain) {
 }
 
 func (ui *tcellUI) SetKeybinding(seq string, fn func()) {
-	ui.keybindings = append(ui.keybindings, &Keybinding{
-		Sequence: seq,
-		Handler:  fn,
+	ui.keybindings = append(ui.keybindings, &keybinding{
+		sequence: seq,
+		handler:  fn,
 	})
 }
 
@@ -80,10 +78,6 @@ func (ui *tcellUI) Run() error {
 	ui.screen.EnableMouse()
 	ui.screen.Clear()
 
-	Repaint = func() {
-		ui.eventQueue <- PaintEvent{}
-	}
-
 	go func() {
 		for {
 			switch ev := ui.screen.PollEvent().(type) {
@@ -97,8 +91,6 @@ func (ui *tcellUI) Run() error {
 		}
 	}()
 
-	Repaint()
-
 	for {
 		select {
 		case <-ui.quit:
@@ -109,18 +101,21 @@ func (ui *tcellUI) Run() error {
 	}
 }
 
-func (ui *tcellUI) handleEvent(ev Event) {
+func (ui *tcellUI) handleEvent(ev event) {
 	switch e := ev.(type) {
 	case KeyEvent:
 		for _, b := range ui.keybindings {
-			if b.Match(e) {
-				b.Handler()
+			if b.match(e) {
+				b.handler()
 			}
 		}
 		ui.kbFocus.OnKeyEvent(e)
 		ui.root.OnKeyEvent(e)
 		ui.painter.Repaint(ui.root)
-	case PaintEvent:
+	case callbackEvent:
+		e.cbFn()
+		ui.painter.Repaint(ui.root)
+	case paintEvent:
 		ui.painter.Repaint(ui.root)
 	}
 }
@@ -139,13 +134,28 @@ func (ui *tcellUI) handleMouseEvent(ev *tcell.EventMouse) {
 }
 
 func (ui *tcellUI) handleResizeEvent(ev *tcell.EventResize) {
-	ui.eventQueue <- PaintEvent{}
+	ui.eventQueue <- paintEvent{}
 }
 
 // Quit signals to the UI to start shutting down.
 func (ui *tcellUI) Quit() {
 	ui.screen.Fini()
 	ui.quit <- struct{}{}
+}
+
+// Schedule an update of the UI, running the given
+// function in the UI goroutine.
+//
+// Use this to update the UI in response to external events,
+// like a timer tick.
+// This method should be used any time you call methods
+// to change UI objects after the first call to `UI.Run()`;
+// changes invoked outside of either this callback or the
+// other event handler callbacks may appear to work, but
+// is likely a race condition.  (Run your program with
+// `go run -race` or `go install -race` to detect this!)
+func (ui *tcellUI) Update(fn func()) {
+	ui.eventQueue <- callbackEvent{fn}
 }
 
 var _ Surface = &tcellSurface{}
@@ -157,13 +167,20 @@ type tcellSurface struct {
 func (s *tcellSurface) SetCell(x, y int, ch rune, style Style) {
 	st := tcell.StyleDefault.Normal().
 		Foreground(convertColor(style.Fg, false)).
-		Background(convertColor(style.Bg, false))
+		Background(convertColor(style.Bg, false)).
+		Reverse(style.Reverse).
+		Bold(style.Bold).
+		Underline(style.Underline)
 
 	s.screen.SetContent(x, y, ch, nil, st)
 }
 
 func (s *tcellSurface) SetCursor(x, y int) {
 	s.screen.ShowCursor(x, y)
+}
+
+func (s *tcellSurface) HideCursor() {
+	s.screen.HideCursor()
 }
 
 func (s *tcellSurface) Begin() {

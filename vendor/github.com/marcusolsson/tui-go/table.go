@@ -72,17 +72,27 @@ func (t *Table) Draw(p *Painter) {
 				style += ".selected"
 			}
 
-			pos := image.Point{i, j}
-			wp := t.mapCellToLocal(pos)
+			p.WithStyle(style, func(p *Painter) {
+				pos := image.Point{i, j}
+				wp := t.mapCellToLocal(pos)
 
-			if w, ok := t.cells[pos]; ok {
 				p.Translate(wp.X, wp.Y)
-				w.Draw(p.WithMask(image.Rectangle{
-					Min: image.ZP,
-					Max: w.Size().Sub(image.Point{1, 1}),
-				}))
-				p.Restore()
-			}
+				defer p.Restore()
+
+				if w, ok := t.cells[pos]; ok {
+					size := w.Size()
+					size.X = t.colWidths[i]
+
+					p.FillRect(0, 0, size.X, size.Y)
+
+					p.WithMask(image.Rectangle{
+						Min: image.ZP,
+						Max: size,
+					}, func(p *Painter) {
+						w.Draw(p)
+					})
+				}
+			})
 		}
 	}
 }
@@ -142,6 +152,22 @@ func (t *Table) Select(i int) {
 	if t.onSelectionChanged != nil {
 		t.onSelectionChanged(t)
 	}
+}
+
+// RemoveRow removes specific row from the table
+func (t *Table) RemoveRow(index int) {
+	t.Grid.RemoveRow(index)
+	if t.selected == index {
+		t.selected = -1
+	} else if t.selected > index {
+		t.selected--
+	}
+}
+
+// RemoveRows removes all the rows added to the table.
+func (t *Table) RemoveRows() {
+	t.Grid.RemoveRows()
+	t.selected = -1
 }
 
 // OnItemActivated sets the function that is called when an item was activated.
