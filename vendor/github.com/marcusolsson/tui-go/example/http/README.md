@@ -1,3 +1,0 @@
-# http
-
-![Screenshot](screenshot.png)
